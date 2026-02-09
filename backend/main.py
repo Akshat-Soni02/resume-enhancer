@@ -9,13 +9,21 @@ from gemini_client import analyze_resume_with_gemini
 app = FastAPI(title="Resume Optimizer API")
 
 # CORS configuration - must be added before routes
-# For development, allow all origins
+# Allow specific origins for production and development
+allowed_origins = [
+    "https://resume-enhancer-pearl.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
-    allow_credentials=False,  # Set to False when using allow_origins=["*"]
-    allow_methods=["*"],  # Allow all methods
-    allow_headers=["*"],  # Allow all headers
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-API-Key", "Authorization", "Accept"],
+    expose_headers=["*"],
 )
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -96,5 +104,6 @@ async def process_resume(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
