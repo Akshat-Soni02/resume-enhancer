@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use environment variable or default to localhost for development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://resume-optimizer-api-zuxawvln7a-el.a.run.app';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://resume-optimizer-api-518868709.asia-south1.run.app';
 
 /**
  * Process resume against job description
