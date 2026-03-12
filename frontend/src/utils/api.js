@@ -31,3 +31,24 @@ export const processResume = async (jd, resumeFile, apiKey, modelId) => {
   return response.data;
 };
 
+/**
+ * Assisted-edit flow: analyze pasted resume source (LaTeX, Doc text, etc.) against JD
+ * @param {string} jd - Job description text
+ * @param {string} source - Full pasted resume source (LaTeX or plain text)
+ * @param {string} apiKey - Gemini API key
+ * @param {string} [modelId] - Optional Gemini model ID
+ * @returns {Promise<Object>} Same shape as process: score, analysis, suggested_edits
+ */
+export const processSource = async (jd, source, apiKey, modelId) => {
+  const params = new URLSearchParams();
+  params.append('jd', jd);
+  params.append('source', source);
+  const headers = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'X-API-Key': apiKey,
+  };
+  if (modelId) headers['X-Gemini-Model'] = modelId;
+  const response = await axios.post(`${API_BASE_URL}/process-source`, params, { headers });
+  return response.data;
+};
+

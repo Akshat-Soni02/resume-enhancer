@@ -1,7 +1,17 @@
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Edit3, TrendingUp } from 'lucide-react';
+import { AlertCircle, Edit3, TrendingUp, Copy } from 'lucide-react';
 
 const ResultsDisplay = ({ results }) => {
+  const [copiedIndex, setCopiedIndex] = useState(null);
+
+  const copySuggested = useCallback((text, index) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    });
+  }, []);
+
   if (!results) return null;
 
   const { score, analysis, suggested_edits } = results;
@@ -90,9 +100,24 @@ const ResultsDisplay = ({ results }) => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="p-4 bg-blue-50 rounded-lg border border-blue-100"
+                className="p-4 bg-blue-50 rounded-lg border border-blue-100 relative"
               >
-                <p className="text-xs font-medium text-blue-900 mb-2">{edit.location}</p>
+                <div className="absolute top-3 right-3">
+                  <button
+                    type="button"
+                    onClick={() => copySuggested(edit.suggested, index)}
+                    title="Copy suggested edit"
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                  {copiedIndex === index && (
+                    <span className="absolute -top-1 left-full ml-1 text-xs text-green-600 whitespace-nowrap">
+                      Copied!
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-medium text-blue-900 mb-2 pr-10">{edit.location}</p>
                 <div className="space-y-2">
                   <div>
                     <p className="text-xs font-medium text-gray-600 mb-1">Original:</p>

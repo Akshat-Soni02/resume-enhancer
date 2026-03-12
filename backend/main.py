@@ -4,7 +4,7 @@ from typing import Optional
 import os
 
 from text_extraction import extract_text_from_file
-from gemini_client import analyze_resume_with_gemini
+from gemini_client import analyze_resume_with_gemini, analyze_source_with_gemini
 
 app = FastAPI(title="Resume Optimizer API")
 
@@ -104,6 +104,35 @@ async def process_resume(
             raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
         else:
             raise HTTPException(status_code=500, detail=f"An error occurred: {error_message}")
+
+
+@app.post("/process-source")
+async def process_source(
+    jd: str = Form(...),
+    source: str = Form(...),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    x_gemini_model: Optional[str] = Header(None, alias="X-Gemini-Model"),
+):
+    """
+    Assisted-edit flow: analyze pasted resume source (LaTeX, Doc text, etc.) against JD.
+    Returns score, analysis, and suggested_edits with exact substrings for find-and-replace.
+    """
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="API key is required in X-API-Key header")
+    if not source or len(source.strip()) < 50:
+        raise HTTPException(status_code=400, detail="Source text is required and must be at least 50 characters.")
+    try:
+        result = analyze_source_with_gemini(jd.strip(), source, x_api_key, x_gemini_model)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        error_message = str(e)
+        if "401" in error_message or "Unauthorized" in error_message:
+            raise HTTPException(status_code=401, detail="Invalid API key. Please check your Gemini API key.")
+        elif "429" in error_message or "rate limit" in error_message.lower():
+            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+        raise HTTPException(status_code=500, detail=f"An error occurred: {error_message}")
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ import JobDescriptionInput from './components/JobDescriptionInput';
 import ResumeUpload from './components/ResumeUpload';
 import LoadingState from './components/LoadingState';
 import ResultsDisplay from './components/ResultsDisplay';
+import AssistedEditView from './components/AssistedEditView';
 import { processResume } from './utils/api';
 import axios from 'axios';
 
@@ -18,6 +19,7 @@ function App() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('compare'); // 'compare' | 'assistedEdit'
   const lastProcessedRef = useRef({ jd: '', file: null });
 
   // Load API key and model from LocalStorage on mount
@@ -139,8 +141,51 @@ function App() {
         </div>
       </header>
 
+      {/* Tabs */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex gap-1" aria-label="Tabs">
+            <button
+              type="button"
+              onClick={() => setActiveTab('compare')}
+              className={`px-4 py-3 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+                activeTab === 'compare'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Optimize
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('assistedEdit')}
+              className={`px-4 py-3 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+                activeTab === 'assistedEdit'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Assisted Edit
+            </button>
+          </nav>
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'assistedEdit' && (
+          <AssistedEditView
+            apiKey={apiKey}
+            selectedModel={selectedModel}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onClearApiKey={() => {
+              clearApiKey();
+              setApiKey(null);
+            }}
+          />
+        )}
+        {activeTab === 'compare' && (
+          <>
         {error && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -150,7 +195,6 @@ function App() {
             <p className="text-sm text-red-800">{error}</p>
           </motion.div>
         )}
-
         {!results && !isProcessing && (
           <div className="space-y-6">
             <JobDescriptionInput
@@ -199,6 +243,8 @@ function App() {
             </div>
             <ResultsDisplay results={results} />
           </motion.div>
+        )}
+          </>
         )}
       </main>
 

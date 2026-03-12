@@ -1,5 +1,6 @@
 import google.generativeai as genai
 import json
+from datetime import date
 from typing import Dict, Any, Optional
 
 # Define the response schema
@@ -96,11 +97,14 @@ def analyze_resume_with_gemini(jd: str, resume_text: str, api_key: str, model_na
     system_prompt = """You are an elite Technical Recruiter, ATS (Applicant Tracking System) Expert, and Senior Hiring Manager. Your objective is to analyze a candidate's resume against a specific Job Description (JD) and provide actionable, hyper-specific feedback.
 
 Strict Rules of Engagement:
-1. IMMUTABLE FACTS (CRITICAL): NEVER suggest edits to factual data. Do not change dates of employment, graduation years, university names, or company names under any circumstances. Focus entirely on optimizing the impact, phrasing, and keyword alignment of bullet points and summaries. Do not modify any dates to justify experience or education.
-2. Gap-to-Edit Linkage: For every actionable gap identified in the `critical_gaps_and_irrelevance` array, you MUST provide a corresponding rewrite in `suggested_edits`. Show the user exactly how to reframe their existing experience to mitigate that specific gap.
-3. Impact Over Duties: Transform weak "responsibilities" into quantifiable achievements using the formula: "Accomplished [X] as measured by [Y], by doing [Z]". Use placeholders like "[Insert % metric here]" if numbers are missing.
-4. Exact Quotation: In `suggested_edits`, the `original` field MUST be an exact, word-for-word copy from the resume. Do not paraphrase. The `suggested` field must be the fully polished replacement.
-5. Ruthless Relevance: Call out fluff or outdated experiences that do not serve the JD.
+1. IMMUTABLE FACTS (CRITICAL): NEVER suggest edits to factual data. Do not change dates of employment, graduation years, university names, or company names under any circumstances. 
+2. NO FABRICATION OF SKILLS (CRITICAL): You must NEVER invent tools, programming languages, or frameworks that the candidate did not explicitly mention in their original resume. If the JD requires 'Redis' but the resume only says 'caching', do not assume they used Redis. Instead, use a bracketed prompt for the user: "...implementing caching [insert Redis if used here]...". Do not make the candidate lie.
+3. Natural Impact Formatting: Transform weak responsibilities into quantifiable achievements. Conceptually use the "XYZ formula" (Action + Impact/Metric + Method/Tech), but DO NOT literally write the robotic words "Accomplished... as measured by... by doing...". 
+    - BAD: "Accomplished a 30% boost as measured by latency by doing engineering..."
+    - GOOD: "Boosted API throughput by 30% and reduced latency by engineering high-performance distributed backend modules using Java 17+ and Spring Boot."
+4. Gap-to-Edit Linkage: For every actionable gap identified, you MUST provide a corresponding rewrite in `suggested_edits`. 
+5. Exact Quotation: In `suggested_edits`, the `original` field MUST be an exact, word-for-word copy from the resume. Do not paraphrase. The `suggested` field must be the fully polished replacement.
+6. Ruthless Relevance: Call out fluff or outdated experiences that do not serve the JD.
 
 Scoring Logic (0-100) & Weightage Hierarchy:
 Calculate the match score using this strict descending order of importance:
@@ -118,8 +122,11 @@ Based on this hierarchy:
 
 Tone: Professional, direct, constructive, and hyper-focused on factual alignment with the JD."""
     
-    # Construct the user prompt
-    user_prompt = f"""Target Job Description:
+    today = date.today().strftime("%B %d, %Y")
+    user_prompt = f"""Reference date (use this as "today" when computing total experience, tenure, or years — do not use your training cutoff):
+{today}
+
+Target Job Description:
 ---
 {jd}
 ---
@@ -175,4 +182,85 @@ Execute the analysis and output the required JSON structure."""
             raise Exception("429 Rate limit exceeded")
         else:
             raise Exception(f"Gemini API error: {error_msg}")
+
+
+def analyze_source_with_gemini(jd: str, source_text: str, api_key: str, model_name: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Analyze pasted resume source (LaTeX, Doc text, etc.) against JD for assisted edit flow.
+    Ensures 'original' and 'suggested' are exact substrings and LaTeX-safe.
+    """
+    model_id = (model_name or DEFAULT_MODEL).strip() if model_name else DEFAULT_MODEL
+    if model_id not in ALLOWED_MODELS:
+        model_id = DEFAULT_MODEL
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(
+        model_name=model_id,
+        generation_config={
+            "temperature": 0.2,
+            "response_mime_type": "application/json",
+            "response_schema": RESPONSE_SCHEMA,
+        }
+    )
+
+    system_prompt = """You are an elite Technical Recruiter and Resume Editor. The user has pasted their FULL resume SOURCE (raw text): it may be LaTeX code, Google Docs–style plain text, or any other format. They want suggested edits to better match a Job Description.
+
+CRITICAL RULES FOR THIS MODE:
+1. EXACT SUBSTRING: The `original` field in every suggested_edits item MUST be an EXACT, character-for-character copy of a contiguous substring from the user's pasted source. Copy-paste from their source; do not paraphrase or normalize. The user's tool will do find-and-replace, so if "original" does not match exactly, the edit will fail.
+2. SUGGESTED MUST BE SAFE: The `suggested` field must be the replacement. If the source is LaTeX: "suggested" MUST be valid LaTeX (matching braces, valid commands like \\textbf{}, no broken backslashes, preserve structure). If the source is plain text, keep it plain. Do not introduce syntax errors.
+3. ORDER: Return suggested_edits in the order the edits appear in the document (top to bottom). This ensures the user's tool can apply them correctly.
+4. IMMUTABLE FACTS: Do not change dates, company names, university names, or degree names. Only rephrase for impact and JD alignment.
+5. Gap-to-Edit: For gaps in critical_gaps_and_irrelevance, provide a corresponding suggested_edits entry showing how to reframe existing content.
+6. Location: The `location` field should briefly describe where in the resume (e.g. "Experience bullet at Company X") so the user can orient.
+7. NO FABRICATION OF SKILLS (CRITICAL): You must NEVER invent tools, programming languages, or frameworks that the candidate did not explicitly mention in their original resume. If the JD requires 'Redis' but the resume only says 'caching', do not assume they used Redis. Instead, use a bracketed prompt for the user: "...implementing caching [insert Redis if used here]...". Do not make the candidate lie.
+8. Natural Impact Formatting: Transform weak responsibilities into quantifiable achievements. Conceptually use the "XYZ formula" (Action + Impact/Metric + Method/Tech), but DO NOT literally write the robotic words "Accomplished... as measured by... by doing...". 
+    - BAD: "Accomplished a 30% boost as measured by latency by doing engineering..."
+    - GOOD: "Boosted API throughput by 30% and reduced latency by engineering high-performance distributed backend modules using Java 17+ and Spring Boot."
+
+Scoring (0-100) and tone: Same as standard resume analysis—prioritize experience, must-haves, then skills. Be direct and constructive."""
+
+    today = date.today().strftime("%B %d, %Y")
+    user_prompt = f"""Reference date (use this as "today" when computing total experience, tenure, or years — do not use your training cutoff):
+{today}
+
+Job Description:
+---
+{jd}
+---
+
+Candidate resume source (exact text/LaTeX the user pasted — your "original" values must be exact substrings of this):
+---
+{source_text}
+---
+
+Output the JSON with score, analysis.critical_gaps_and_irrelevance, and suggested_edits. Every "original" must appear exactly in the source above. Return edits in document order."""
+
+    try:
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
+        response = model.generate_content(full_prompt)
+        response_text = response.text.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        elif response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+        result = json.loads(response_text)
+        if not isinstance(result, dict):
+            raise ValueError("Response is not a valid JSON object")
+        if "score" not in result or "analysis" not in result or "suggested_edits" not in result:
+            raise ValueError("Response missing required fields: score, analysis, or suggested_edits")
+        if "critical_gaps_and_irrelevance" not in result.get("analysis", {}):
+            raise ValueError("Analysis missing required field: critical_gaps_and_irrelevance")
+        return result
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to parse JSON response from Gemini: {str(e)}")
+    except Exception as e:
+        error_msg = str(e)
+        if "API key" in error_msg or "401" in error_msg or "Unauthorized" in error_msg:
+            raise Exception("401 Unauthorized: Invalid API key")
+        elif "429" in error_msg or "rate limit" in error_msg.lower():
+            raise Exception("429 Rate limit exceeded")
+        raise Exception(f"Gemini API error: {error_msg}")
 
