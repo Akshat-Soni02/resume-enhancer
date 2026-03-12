@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
-import SettingsModal, { getApiKey, clearApiKey } from './components/SettingsModal';
+import SettingsModal, { getApiKey, getModel, clearApiKey } from './components/SettingsModal';
 import JobDescriptionInput from './components/JobDescriptionInput';
 import ResumeUpload from './components/ResumeUpload';
 import LoadingState from './components/LoadingState';
@@ -13,13 +13,14 @@ function App() {
   const [jobDescription, setJobDescription] = useState('');
   const [resumeFile, setResumeFile] = useState(null);
   const [apiKey, setApiKey] = useState(null);
+  const [selectedModel, setSelectedModel] = useState(() => getModel());
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const lastProcessedRef = useRef({ jd: '', file: null });
 
-  // Load API key from LocalStorage on mount
+  // Load API key and model from LocalStorage on mount
   useEffect(() => {
     const storedKey = getApiKey();
     if (storedKey) {
@@ -27,6 +28,7 @@ function App() {
     } else {
       setIsSettingsOpen(true);
     }
+    setSelectedModel(getModel());
   }, []);
 
   const handleProcess = useCallback(async () => {
@@ -52,7 +54,7 @@ function App() {
     lastProcessedRef.current = { jd: jobDescription.trim(), file: resumeFile };
 
     try {
-      const result = await processResume(jobDescription, resumeFile, apiKey);
+      const result = await processResume(jobDescription, resumeFile, apiKey, selectedModel);
       setResults(result);
     } catch (err) {
       if (axios.isAxiosError(err)) {
@@ -80,7 +82,7 @@ function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [jobDescription, resumeFile, apiKey]);
+  }, [jobDescription, resumeFile, apiKey, selectedModel]);
 
   // Auto-trigger processing when both JD and resume are present
   useEffect(() => {
@@ -92,11 +94,15 @@ function App() {
     if (hasBoth && !isProcessing && !alreadyProcessed) {
       handleProcess();
     }
-  }, [jobDescription, resumeFile, apiKey, isProcessing, handleProcess]);
+  }, [jobDescription, resumeFile, apiKey, selectedModel, isProcessing, handleProcess]);
 
 
   const handleApiKeySet = (key) => {
     setApiKey(key);
+  };
+
+  const handleModelSet = (modelId) => {
+    setSelectedModel(modelId);
   };
 
   const handleReset = () => {
@@ -105,6 +111,14 @@ function App() {
     setResults(null);
     setError(null);
     lastProcessedRef.current = { jd: '', file: null };
+  };
+
+  // Keep current JD, clear resume and results so user can upload a different resume
+  const handleSameJdNewResume = () => {
+    setResumeFile(null);
+    setResults(null);
+    setError(null);
+    lastProcessedRef.current = { jd: jobDescription.trim(), file: null };
   };
 
   return (
@@ -165,14 +179,23 @@ function App() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-xl font-semibold text-gray-900">Analysis Results</h2>
-              <button
-                onClick={handleReset}
-                className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                Analyze Another Resume
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSameJdNewResume}
+                  title="Re-evaluate with different resume"
+                  className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Analyze Another Resume
+                </button>
+              </div>
             </div>
             <ResultsDisplay results={results} />
           </motion.div>
@@ -184,6 +207,7 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onApiKeySet={handleApiKeySet}
+        onModelSet={handleModelSet}
       />
     </div>
   );

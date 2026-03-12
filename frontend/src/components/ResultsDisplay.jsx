@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { CheckCircle2, AlertCircle, Edit3, TrendingUp } from 'lucide-react';
+import { AlertCircle, Edit3, TrendingUp } from 'lucide-react';
 
 const ResultsDisplay = ({ results }) => {
   if (!results) return null;
@@ -51,30 +51,6 @@ const ResultsDisplay = ({ results }) => {
           </div>
         </div>
       </motion.div>
-
-      {/* Strengths */}
-      {analysis.strengths && analysis.strengths.length > 0 && (
-        <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle2 className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Strengths</h3>
-          </div>
-          <ul className="space-y-3">
-            {analysis.strengths.map((strength, index) => (
-              <motion.li
-                key={index}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100"
-              >
-                <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-700">{strength}</p>
-              </motion.li>
-            ))}
-          </ul>
-        </motion.div>
-      )}
 
       {/* Critical Gaps */}
       {analysis.critical_gaps_and_irrelevance && analysis.critical_gaps_and_irrelevance.length > 0 && (

@@ -9,12 +9,13 @@ from gemini_client import analyze_resume_with_gemini
 app = FastAPI(title="Resume Optimizer API")
 
 # CORS configuration - must be added before routes
-# Allow specific origins for production and development
+# Allow specific origins for production and development (localhost + 127.0.0.1 for both ports)
 allowed_origins = [
     "https://resume-enhancer-pearl.vercel.app",
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
@@ -22,8 +23,9 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-API-Key", "Authorization", "Accept"],
+    allow_headers=["Content-Type", "X-API-Key", "X-Gemini-Model", "Authorization", "Accept"],
     expose_headers=["*"],
+    max_age=600,
 )
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -42,7 +44,8 @@ async def health():
 async def process_resume(
     jd: str = Form(...),
     resume: UploadFile = File(...),
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    x_gemini_model: Optional[str] = Header(None, alias="X-Gemini-Model"),
 ):
     """
     Process resume against job description using Gemini API.
@@ -51,6 +54,7 @@ async def process_resume(
         jd: Job description text
         resume: Resume file (PDF or DOCX)
         x_api_key: Gemini API key from header
+        x_gemini_model: Optional Gemini model ID from header
     
     Returns:
         JSON response with score, analysis, and suggested edits
@@ -85,7 +89,7 @@ async def process_resume(
             )
         
         # Analyze with Gemini
-        result = analyze_resume_with_gemini(jd, resume_text, x_api_key)
+        result = analyze_resume_with_gemini(jd, resume_text, x_api_key, x_gemini_model)
         
         return result
         

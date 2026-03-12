@@ -1,6 +1,6 @@
 import google.generativeai as genai
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 # Define the response schema
 RESPONSE_SCHEMA = {
@@ -13,13 +13,6 @@ RESPONSE_SCHEMA = {
         "analysis": {
             "type": "object",
             "properties": {
-                "strengths": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "description": "List of strengths with section citations"
-                },
                 "critical_gaps_and_irrelevance": {
                     "type": "array",
                     "items": {
@@ -28,7 +21,7 @@ RESPONSE_SCHEMA = {
                     "description": "List of critical gaps and irrelevant content with section citations"
                 }
             },
-            "required": ["strengths", "critical_gaps_and_irrelevance"]
+            "required": ["critical_gaps_and_irrelevance"]
         },
         "suggested_edits": {
             "type": "array",
@@ -56,7 +49,17 @@ RESPONSE_SCHEMA = {
 }
 
 
-def analyze_resume_with_gemini(jd: str, resume_text: str, api_key: str) -> Dict[str, Any]:
+# Allowed Gemini model IDs (user-selectable)
+ALLOWED_MODELS = {
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3-flash-preview",
+}
+DEFAULT_MODEL = "gemini-3-flash-preview"
+
+
+def analyze_resume_with_gemini(jd: str, resume_text: str, api_key: str, model_name: Optional[str] = None) -> Dict[str, Any]:
     """
     Analyze resume against job description using Google Gemini API.
     
@@ -64,6 +67,7 @@ def analyze_resume_with_gemini(jd: str, resume_text: str, api_key: str) -> Dict[
         jd: Job description text
         resume_text: Extracted resume text
         api_key: Gemini API key
+        model_name: Optional Gemini model ID; must be in ALLOWED_MODELS. Defaults to DEFAULT_MODEL.
     
     Returns:
         Dictionary containing score, analysis, and suggested edits
@@ -71,12 +75,16 @@ def analyze_resume_with_gemini(jd: str, resume_text: str, api_key: str) -> Dict[
     Raises:
         Exception: If API call fails or response is invalid
     """
+    model_id = (model_name or DEFAULT_MODEL).strip() if model_name else DEFAULT_MODEL
+    if model_id not in ALLOWED_MODELS:
+        model_id = DEFAULT_MODEL
+
     # Configure Gemini
     genai.configure(api_key=api_key)
     
     # Create the model with structured JSON output using response_schema
     model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
+        model_name=model_id,
         generation_config={
             "temperature": 0.3,
             "response_mime_type": "application/json",
@@ -85,24 +93,43 @@ def analyze_resume_with_gemini(jd: str, resume_text: str, api_key: str) -> Dict[
     )
     
     # Construct the system prompt (simplified since schema enforces structure)
-    system_prompt = """You are a world-class Technical Recruiter and Resume Optimizer. Your task is to analyze a candidate's Resume against a Job Description (JD). You must provide a cold, factual, and section-specific breakdown of how the resume performs.
+    system_prompt = """You are an elite Technical Recruiter, ATS (Applicant Tracking System) Expert, and Senior Hiring Manager. Your objective is to analyze a candidate's resume against a specific Job Description (JD) and provide actionable, hyper-specific feedback.
 
-Logic Rules:
-1. Strict Context: For every point in critical_gaps_and_irrelevance, you must cite a specific section of the resume and a specific requirement from the JD.
-2. Irrelevance Check: If the user has included a large section that does not serve the JD (e.g., a long list of soft skills when the JD asks for hard engineering skills), flag it as "Irrelevant/Low Value" and suggest removal.
-3. No Generic Advice: Do not say "Make it more concise." Instead, say "Section [Summary] is 5 lines long; the JD values brevity. Reduce to 2 lines focusing on [Specific Skill]."
-4. Actionable Edits: In suggested_edits, if you are modifying a line, provide the entire new line so the user can copy-paste it directly.
-5. Score Calculation: Base the score on alignment with JD requirements, presence of required skills, and relevance of experience.
-"""
+Strict Rules of Engagement:
+1. IMMUTABLE FACTS (CRITICAL): NEVER suggest edits to factual data. Do not change dates of employment, graduation years, university names, or company names under any circumstances. Focus entirely on optimizing the impact, phrasing, and keyword alignment of bullet points and summaries. Do not modify any dates to justify experience or education.
+2. Gap-to-Edit Linkage: For every actionable gap identified in the `critical_gaps_and_irrelevance` array, you MUST provide a corresponding rewrite in `suggested_edits`. Show the user exactly how to reframe their existing experience to mitigate that specific gap.
+3. Impact Over Duties: Transform weak "responsibilities" into quantifiable achievements using the formula: "Accomplished [X] as measured by [Y], by doing [Z]". Use placeholders like "[Insert % metric here]" if numbers are missing.
+4. Exact Quotation: In `suggested_edits`, the `original` field MUST be an exact, word-for-word copy from the resume. Do not paraphrase. The `suggested` field must be the fully polished replacement.
+5. Ruthless Relevance: Call out fluff or outdated experiences that do not serve the JD.
+
+Scoring Logic (0-100) & Weightage Hierarchy:
+Calculate the match score using this strict descending order of importance:
+- 1st Priority (Highest Weight): Required Experience Level (e.g., total years or specific domain experience matching the JD).
+- 2nd Priority: Explicit "Must-Have" or "Required" qualifications highlighted in the JD.
+- 3rd Priority: Specific technologies, tools, and hard skills mentioned.
+- 4th Priority: "Preferred" or "Nice-to-have" qualifications.
+- 5th Priority (Lowest Weight): General purpose skills (e.g., "team player", "communication").
+
+Based on this hierarchy:
+- 90-100: Exceptional alignment across top priorities.
+- 75-89: Meets experience and most must-haves, but needs keyword/metric injection (3rd/4th priorities).
+- 50-74: Missing core technologies or falls slightly short on must-haves; needs significant reframing.
+- <50: Fundamental mismatch in Experience (1st Priority) or Must-Haves (2nd Priority).
+
+Tone: Professional, direct, constructive, and hyper-focused on factual alignment with the JD."""
     
     # Construct the user prompt
-    user_prompt = f"""Job Description:
+    user_prompt = f"""Target Job Description:
+---
 {jd}
+---
 
-Resume:
+Candidate Resume:
+---
 {resume_text}
+---
 
-Analyze the resume against the job description and provide your assessment."""
+Execute the analysis and output the required JSON structure."""
     
     try:
         # Generate response - schema enforces JSON structure automatically
@@ -132,8 +159,8 @@ Analyze the resume against the job description and provide your assessment."""
         if "score" not in result or "analysis" not in result or "suggested_edits" not in result:
             raise ValueError("Response missing required fields: score, analysis, or suggested_edits")
         
-        if "strengths" not in result["analysis"] or "critical_gaps_and_irrelevance" not in result["analysis"]:
-            raise ValueError("Analysis missing required fields: strengths or critical_gaps_and_irrelevance")
+        if "critical_gaps_and_irrelevance" not in result["analysis"]:
+            raise ValueError("Analysis missing required field: critical_gaps_and_irrelevance")
         
         return result
         

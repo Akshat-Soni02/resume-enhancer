@@ -3,6 +3,17 @@ import { X, Key } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const API_KEY_STORAGE = 'gemini_api_key';
+const MODEL_STORAGE = 'gemini_model';
+
+// Default = best model
+export const DEFAULT_MODEL_ID = 'gemini-3-flash-preview';
+
+export const GEMINI_MODEL_OPTIONS = [
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+  { id: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite (Fastest)' },
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (Default)' },
+];
 
 export const getApiKey = () => {
   return localStorage.getItem(API_KEY_STORAGE);
@@ -20,14 +31,30 @@ export const clearApiKey = () => {
   localStorage.removeItem(API_KEY_STORAGE);
 };
 
-const SettingsModal = ({ isOpen, onClose, onApiKeySet }) => {
+export const getModel = () => {
+  const stored = localStorage.getItem(MODEL_STORAGE);
+  if (stored && GEMINI_MODEL_OPTIONS.some((o) => o.id === stored)) return stored;
+  return DEFAULT_MODEL_ID;
+};
+
+export const setModel = (modelId) => {
+  if (modelId) {
+    localStorage.setItem(MODEL_STORAGE, modelId);
+  } else {
+    localStorage.removeItem(MODEL_STORAGE);
+  }
+};
+
+const SettingsModal = ({ isOpen, onClose, onApiKeySet, onModelSet }) => {
   const [apiKey, setApiKeyLocal] = useState('');
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       const storedKey = getApiKey();
       setApiKeyLocal(storedKey || '');
+      setSelectedModel(getModel());
       setError('');
     }
   }, [isOpen]);
@@ -39,14 +66,19 @@ const SettingsModal = ({ isOpen, onClose, onApiKeySet }) => {
     }
 
     setApiKey(apiKey.trim());
+    setModel(selectedModel);
     onApiKeySet(apiKey.trim());
+    onModelSet?.(selectedModel);
     onClose();
   };
 
   const handleClear = () => {
     setApiKeyLocal('');
+    setSelectedModel(DEFAULT_MODEL_ID);
     clearApiKey();
+    setModel(DEFAULT_MODEL_ID);
     onApiKeySet(null);
+    onModelSet?.(DEFAULT_MODEL_ID);
     onClose();
   };
 
@@ -101,7 +133,27 @@ const SettingsModal = ({ isOpen, onClose, onApiKeySet }) => {
                     <p className="mt-1 text-sm text-red-600">{error}</p>
                   )}
                   <p className="mt-2 text-xs text-gray-500">
-                    Your API key is stored locally in your browser and never sent to our servers.
+                    Your API key is stored locally in your browser and never stored to our servers.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gemini model
+                  </label>
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
+                  >
+                    {GEMINI_MODEL_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Default is the best quality model.
                   </p>
                 </div>
 

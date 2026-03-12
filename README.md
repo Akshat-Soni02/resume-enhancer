@@ -9,7 +9,6 @@ A full-stack web application that compares a user's resume against a job descrip
 - **Drag & Drop Upload**: Easy file upload for PDF and DOCX resumes
 - **Comprehensive Analysis**: 
   - Match score (0-100)
-  - Strengths identification
   - Critical gaps and irrelevance detection
   - Actionable suggested edits
 - **Modern UI**: Clean, minimalist design with smooth animations
@@ -77,7 +76,7 @@ The frontend will run on `http://localhost:5173`
 
 4. **Automatic Processing**: Once both the job description and resume are provided, processing will start automatically.
 
-5. **Review Results**: View your match score, strengths, gaps, and suggested edits in an easy-to-read format.
+5. **Review Results**: View your match score, gaps, and suggested edits in an easy-to-read format.
 
 ## API Endpoints
 
@@ -97,7 +96,6 @@ Process a resume against a job description.
 {
   "score": 85,
   "analysis": {
-    "strengths": [...],
     "critical_gaps_and_irrelevance": [...]
   },
   "suggested_edits": [...]
