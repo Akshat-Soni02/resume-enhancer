@@ -2,6 +2,8 @@ from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 import os
+import requests
+from fastapi.responses import Response
 
 from text_extraction import extract_text_from_file
 from gemini_client import (
@@ -199,6 +201,37 @@ async def resumeai_optimize(
         elif "429" in error_message or "rate limit" in error_message.lower():
             raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
         raise HTTPException(status_code=500, detail=f"An error occurred: {error_message}")
+
+
+@app.post("/resumeai/compile-latex")
+async def resumeai_compile_latex(
+    latex: str = Form(...),
+):
+    """
+    Compile LaTeX to PDF via latexonline.cc using POST to avoid URL length limits.
+    Returns application/pdf bytes.
+    """
+    if not latex or len(latex.strip()) < 20:
+        raise HTTPException(status_code=400, detail="latex is required.")
+    try:
+        resp = requests.post(
+            "https://latexonline.cc/compile",
+            data={"text": latex},
+            timeout=60,
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"LaTeX compile failed (status {resp.status_code}).")
+        content_type = resp.headers.get("Content-Type", "")
+        if "application/pdf" not in content_type:
+            # latexonline may return error text/html
+            raise HTTPException(status_code=502, detail="LaTeX compile did not return a PDF.")
+        return Response(content=resp.content, media_type="application/pdf")
+    except HTTPException:
+        raise
+    except requests.Timeout:
+        raise HTTPException(status_code=504, detail="LaTeX compile timed out.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 
 if __name__ == "__main__":

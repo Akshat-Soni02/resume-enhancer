@@ -36,3 +36,15 @@ export const optimizeResumeAi = async ({ resumeText, jdSummary, latexTemplate, a
   });
   return response.data;
 };
+
+export const compileResumeAiLatex = async ({ latex }) => {
+  const params = new URLSearchParams();
+  params.append('latex', latex);
+  const response = await axios.post(`${API_BASE_URL}/resumeai/compile-latex`, params, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    responseType: 'arraybuffer',
+  });
+  return response.data;
+};

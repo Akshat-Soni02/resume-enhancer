@@ -16,8 +16,6 @@ import {
   Zap,
   Trophy,
   Search,
-  ExternalLink,
-  Copy,
   Layout,
   RefreshCw,
   Settings,
@@ -294,6 +292,46 @@ const AIStatusLines = ({ lines, isLoading, compact = false }) => {
   );
 };
 
+const ImpactBadge = ({ impact }) => {
+  const normalized = (impact || '').toLowerCase();
+  const styles =
+    normalized === 'high'
+      ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+      : normalized === 'medium'
+      ? 'text-amber-300 bg-amber-500/10 border-amber-500/20'
+      : 'text-sky-300 bg-sky-500/10 border-sky-500/20';
+  const label = normalized ? `${normalized} impact` : 'impact';
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${styles}`}>
+      {label}
+    </span>
+  );
+};
+
+const LatexConsole = ({ filename = 'resume_optimized.tex', content }) => (
+  <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden">
+    <div className="bg-slate-900 px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+      <div className="flex items-center space-x-2">
+        <FileCode size={14} className="text-slate-500" />
+        <span className="text-xs font-mono text-slate-400">{filename}</span>
+      </div>
+      <div className="flex space-x-1">
+        <div className="w-2 h-2 rounded-full bg-slate-800" />
+        <div className="w-2 h-2 rounded-full bg-slate-800" />
+        <div className="w-2 h-2 rounded-full bg-slate-800" />
+      </div>
+    </div>
+    <div className="p-6 h-[600px] overflow-y-auto font-mono text-sm leading-relaxed">
+      {(content || '').split('\n').map((line, i) => (
+        <div key={i} className="whitespace-pre-wrap text-slate-300 hover:bg-slate-900/50 transition-colors">
+          <span className="inline-block w-8 text-slate-700 select-none">{i + 1}</span>
+          {line}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onApiKeyCleared }) {
   const [step, setStep] = useState(1);
   const [jdUrl, setJdUrl] = useState('');
@@ -308,8 +346,6 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
   const [optimizationResult, setOptimizationResult] = useState(null);
   const [currentLatex, setCurrentLatex] = useState('');
   const [acceptedSuggestions, setAcceptedSuggestions] = useState(new Set());
-  const [isCompiling, setIsCompiling] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState('');
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -442,12 +478,18 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
     optimizationResult.suggestions.filter((s) => s.ats_impact === 'high' && !acceptedSuggestions.has(s.id)).forEach(applySuggestion);
   };
 
-  const compilePdf = async () => {
-    setIsCompiling(true);
+  const acceptAllMediumImpact = () => {
+    if (!optimizationResult) return;
+    optimizationResult.suggestions.filter((s) => s.ats_impact === 'medium' && !acceptedSuggestions.has(s.id)).forEach(applySuggestion);
+  };
+
+  const acceptAllChanges = () => {
+    if (!optimizationResult) return;
+    optimizationResult.suggestions.filter((s) => !acceptedSuggestions.has(s.id)).forEach(applySuggestion);
+  };
+
+  const goToExport = () => {
     setStep(3);
-    const encodedTex = encodeURIComponent(currentLatex);
-    setPdfUrl(`https://latexonline.cc/compile?text=${encodedTex}`);
-    setIsCompiling(false);
   };
 
   const downloadTex = () => {
@@ -459,8 +501,6 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const copyToClipboard = () => navigator.clipboard.writeText(currentLatex);
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-200 selection:bg-indigo-500/30">
@@ -657,32 +697,105 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
                 </div>
               ) : (
                 <div className="space-y-8">
-                  <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 flex items-center gap-10">
-                    <ATSMeter score={optimizationResult?.ats_score_before || 0} label="Before" color="#ef4444" />
-                    <ArrowRight className="text-slate-700" />
-                    <ATSMeter score={optimizationResult?.ats_score_after || 0} label="After" color="#10b981" />
-                    <button onClick={acceptAllHighImpact} className="ml-auto text-indigo-400 text-xs font-bold">ACCEPT ALL HIGH IMPACT</button>
+                  {/* Top Bar - Scores + Summary */}
+                  <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div className="flex items-center space-x-12">
+                      <div className="flex flex-col items-center">
+                        <div className="mb-4 flex flex-col items-center">
+                          <div className="px-3 py-1 rounded-full border border-indigo-500/20 bg-indigo-500/10">
+                            <span className="text-xs font-black text-indigo-200 uppercase tracking-[0.3em]">ATS Score</span>
+                          </div>
+                          <div className="mt-3 h-px w-20 bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
+                        </div>
+                        <div className="flex items-center space-x-12">
+                          <ATSMeter score={optimizationResult?.ats_score_before || 0} label="Before" color="#ef4444" />
+                          <div className="flex flex-col items-center">
+                            <ArrowRight className="text-slate-700" size={24} />
+                            <span className="text-[10px] font-black text-indigo-400 mt-2 uppercase tracking-widest">IMPROVED</span>
+                          </div>
+                          <ATSMeter score={optimizationResult?.ats_score_after || 0} label="After" color="#10b981" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 max-w-md">
+                      <h3 className="text-white font-bold mb-2">Optimization Summary</h3>
+                      <p className="text-slate-400 text-sm">
+                        We found <span className="text-indigo-300 font-bold">{optimizationResult?.suggestions?.length || 0}</span> improvements to increase relevance and ATS keyword alignment.
+                      </p>
+                      <div className="mt-4 flex flex-col gap-2">
+                        <button
+                          onClick={acceptAllHighImpact}
+                          className="inline-flex items-center gap-2 text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                        >
+                          <Zap size={14} />
+                          <span>ACCEPT ALL HIGH IMPACT CHANGES</span>
+                        </button>
+                        <button
+                          onClick={acceptAllMediumImpact}
+                          className="inline-flex items-center gap-2 text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                        >
+                          <Zap size={14} />
+                          <span>ACCEPT ALL MEDIUM IMPACT CHANGES</span>
+                        </button>
+                        <button
+                          onClick={acceptAllChanges}
+                          className="inline-flex items-center gap-2 text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                        >
+                          <Zap size={14} />
+                          <span>ACCEPT ALL CHANGES</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
+
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 bg-slate-950 border border-slate-800 rounded-2xl p-4 h-[600px] overflow-y-auto font-mono text-sm">
-                      {currentLatex.split('\n').map((line, i) => <div key={i} className="text-slate-300"><span className="inline-block w-8 text-slate-700">{i + 1}</span>{line}</div>)}
+                    {/* LaTeX Console */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <LatexConsole content={currentLatex} />
                     </div>
                     <div className="space-y-3 h-[600px] overflow-y-auto">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="text-white font-bold flex items-center gap-2">
+                          <Layout size={18} className="text-indigo-400" />
+                          <span>Suggestions</span>
+                        </h3>
+                        <span className="px-2 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-bold rounded-full">
+                          {Math.max(0, (optimizationResult?.suggestions?.length || 0) - acceptedSuggestions.size)} PENDING
+                        </span>
+                      </div>
+
                       {optimizationResult?.suggestions?.map((s) => {
                         const isAccepted = acceptedSuggestions.has(s.id);
                         return (
-                          <div key={s.id} className={`p-3 rounded-xl border ${isAccepted ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-slate-900 border-slate-800'}`}>
+                          <div key={s.id} className={`p-4 rounded-xl border transition-all ${isAccepted ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <ImpactBadge impact={s.ats_impact} />
+                              {isAccepted && <Check size={16} className="text-emerald-500" />}
+                            </div>
                             <p className="text-xs font-bold text-white mb-1">{s.section}</p>
+                            <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">{s.reason}</p>
+
                             {!isAccepted && (
-                              <div className="space-y-2 mb-2">
-                                <div className="text-[10px] text-rose-400 line-through">{s.original_text}</div>
-                                <div className="text-[10px] text-emerald-400">{s.suggested_text}</div>
+                              <div className="space-y-2 mb-4">
+                                <div className="p-2 bg-rose-500/10 border border-rose-500/20 rounded text-[10px] font-mono text-rose-300 line-through">
+                                  {s.original_text}
+                                </div>
+                                <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded text-[10px] font-mono text-emerald-200">
+                                  {s.suggested_text}
+                                </div>
                               </div>
                             )}
+
                             {!isAccepted && (
                               <div className="flex gap-2">
-                                <button onClick={() => applySuggestion(s)} className="flex-1 bg-indigo-600 text-white text-[10px] font-bold py-2 rounded-lg"><Check size={12} className="inline mr-1" />ACCEPT</button>
-                                <button onClick={() => rejectSuggestion(s.id)} className="px-3 bg-slate-800 text-slate-400 text-[10px] font-bold py-2 rounded-lg"><X size={12} /></button>
+                                <button onClick={() => applySuggestion(s)} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-1">
+                                  <Check size={12} />
+                                  <span>ACCEPT</span>
+                                </button>
+                                <button onClick={() => rejectSuggestion(s.id)} className="px-3 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-bold py-2 rounded-lg transition-all">
+                                  <X size={12} />
+                                </button>
                               </div>
                             )}
                           </div>
@@ -690,49 +803,101 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
                       })}
                     </div>
                   </div>
-                  <div className="flex justify-center"><button onClick={compilePdf} className="bg-indigo-600 text-white font-bold px-12 py-4 rounded-xl flex items-center space-x-3"><span>Finalize & Export</span><ChevronRight size={20} /></button></div>
+                  <div className="flex justify-center">
+                    <button onClick={goToExport} className="bg-indigo-600 text-white font-bold px-12 py-4 rounded-xl flex items-center space-x-3">
+                      <span>Finalize & Export</span>
+                      <ChevronRight size={20} />
+                    </button>
+                  </div>
                 </div>
               )
             )}
 
             {step === 3 && (
               <div className="max-w-5xl mx-auto space-y-10">
-                <div className="text-center"><Trophy size={48} className="mx-auto text-emerald-400 mb-3" /><h2 className="text-3xl font-bold text-white">Resume Optimized!</h2></div>
+                <div className="text-center">
+                  <Trophy size={48} className="mx-auto text-emerald-400 mb-3" />
+                  <h2 className="text-3xl font-bold text-white">Resume Optimized!</h2>
+                  <p className="text-slate-400 mt-2">Your resume is now ATS-ready and formatted in professional LaTeX.</p>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
-                    <button onClick={downloadTex} className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-left text-white"><FileCode className="inline mr-2 text-indigo-400" />Download Source (.tex)</button>
-                    <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-white font-bold">PDF Preview</span>
-                        <div className="flex gap-2">
-                          <button onClick={copyToClipboard} className="p-2 bg-slate-800 rounded-lg text-slate-400"><Copy size={16} /></button>
-                          <a href={pdfUrl} target="_blank" rel="noreferrer" className="p-2 bg-indigo-600 rounded-lg text-white"><ExternalLink size={16} /></a>
-                        </div>
-                      </div>
-                      <div className="aspect-[3/4] bg-slate-950 rounded-xl overflow-hidden">
-                        {isCompiling ? (
-                          <div className="p-4">
-                            <Loader2 className="animate-spin text-indigo-500 mb-2" size={24} />
-                            <AIStatusLines
-                              isLoading={isCompiling}
-                              compact
-                              lines={[
-                                'Compiling LaTeX source...',
-                                'Building ATS-ready PDF preview...',
-                                'Finalizing render output...',
-                              ]}
-                            />
+                    <h3 className="text-xl font-bold text-white flex items-center space-x-2">
+                      <Download size={20} className="text-indigo-400" />
+                      <span>Export Options</span>
+                    </h3>
+
+                    <div className="grid grid-cols-1 gap-4">
+                      <button
+                        onClick={downloadTex}
+                        className="group bg-slate-900 border border-slate-800 hover:border-indigo-500/50 p-6 rounded-2xl transition-all text-left flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center space-x-2 mb-1">
+                            <FileCode className="text-indigo-400" size={20} />
+                            <span className="text-white font-bold">Download Source (.tex)</span>
                           </div>
-                        ) : (
-                          <iframe src={pdfUrl} className="w-full h-full border-none" title="PDF Preview" />
-                        )}
-                      </div>
+                          <p className="text-slate-500 text-xs">Full LaTeX source code for Overleaf or local compilation.</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-slate-800 group-hover:bg-indigo-600 flex items-center justify-center transition-all">
+                          <FileDown size={18} className="text-white" />
+                        </div>
+                      </button>
+
                     </div>
                   </div>
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                    <p className="text-slate-500 text-xs font-bold uppercase mb-1">Final ATS Score</p>
-                    <p className="text-4xl font-black text-white">{optimizationResult?.ats_score_after}<span className="text-slate-600 text-xl">/100</span></p>
-                    <button onClick={() => setStep(1)} className="w-full mt-8 border border-slate-800 text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center space-x-2"><RefreshCw size={18} /><span>Optimize Another Resume</span></button>
+                    <h3 className="text-xl font-bold text-white flex items-center space-x-2">
+                      <Zap size={20} className="text-amber-400" />
+                      <span>ATS Analysis</span>
+                    </h3>
+
+                    <div className="mt-6">
+                      <div className="flex items-center justify-between mb-8">
+                        <div>
+                          <p className="text-slate-500 text-xs font-bold uppercase mb-1">Final ATS Score</p>
+                          <p className="text-4xl font-black text-white">
+                            {optimizationResult?.ats_score_after}
+                            <span className="text-slate-600 text-xl">/100</span>
+                          </p>
+                        </div>
+                        <div className="px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-bold">
+                          EXCELLENT MATCH
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <p className="text-xs font-bold text-slate-500 uppercase">Keyword Match Table</p>
+                        <div className="border border-slate-800 rounded-xl overflow-hidden">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-950 text-slate-500 uppercase font-bold">
+                              <tr>
+                                <th className="px-4 py-3">JD Keyword</th>
+                                <th className="px-4 py-3 text-right">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800">
+                              {(jdSummary?.atsKeywords || []).slice(0, 12).map((kw) => (
+                                <tr key={kw} className="hover:bg-slate-800/50 transition-colors">
+                                  <td className="px-4 py-3 text-slate-300">{kw}</td>
+                                  <td className="px-4 py-3 text-right">
+                                    <div className="inline-flex items-center space-x-1 text-emerald-500 font-bold">
+                                      <Check size={12} />
+                                      <span>MATCHED</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button onClick={() => setStep(1)} className="w-full mt-8 border border-slate-800 hover:bg-slate-900 text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center space-x-2">
+                      <RefreshCw size={18} />
+                      <span>Optimize Another Resume</span>
+                    </button>
                   </div>
                 </div>
                 {step === 3 && <Confetti recycle={false} numberOfPieces={200} />}
@@ -742,8 +907,43 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
         </AnimatePresence>
       </main>
 
-      <footer className="border-t border-slate-800 py-10 mt-16">
-        <div className="max-w-7xl mx-auto px-4 text-slate-500 text-sm">ResumeAI integrated with your existing backend.</div>
+      <footer className="border-t border-slate-800 py-12 mt-24">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12">
+          <div className="col-span-1 md:col-span-2">
+            <div className="flex items-center space-x-2 mb-4">
+              <div className="w-6 h-6 bg-indigo-600 rounded flex items-center justify-center">
+                <Zap size={14} className="text-white" />
+              </div>
+              <h1 className="text-lg font-black tracking-tighter text-white">ResumeAI</h1>
+            </div>
+            <p className="text-slate-500 text-sm max-w-sm leading-relaxed">
+              The ultimate AI-powered resume optimizer. Tailor your resume to any job description in seconds and get past the ATS filters.
+            </p>
+          </div>
+          <div>
+            <h4 className="text-white font-bold mb-4 text-sm">Product</h4>
+            <ul className="space-y-2 text-sm text-slate-500">
+              <li><a href="#" className="hover:text-indigo-400 transition-colors">Features</a></li>
+              <li><a href="#" className="hover:text-indigo-400 transition-colors">Pricing</a></li>
+              <li><a href="#" className="hover:text-indigo-400 transition-colors">Templates</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="text-white font-bold mb-4 text-sm">Resources</h4>
+            <ul className="space-y-2 text-sm text-slate-500">
+              <li><a href="#" className="hover:text-indigo-400 transition-colors">Blog</a></li>
+              <li><a href="#" className="hover:text-indigo-400 transition-colors">ATS Guide</a></li>
+              <li><a href="#" className="hover:text-indigo-400 transition-colors">Support</a></li>
+            </ul>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 mt-12 pt-8 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-slate-600 text-xs">© 2026 ResumeAI. Built with Gemini 1.5 Pro.</p>
+          <div className="flex space-x-6 text-slate-600 text-xs">
+            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+          </div>
+        </div>
       </footer>
     </div>
   );
