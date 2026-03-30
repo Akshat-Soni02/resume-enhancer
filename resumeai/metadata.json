@@ -1,0 +1,5 @@
+{
+  "name": "ResumeAI",
+  "description": "AI-powered resume optimizer that tailors resumes to job descriptions and outputs ATS-optimized LaTeX.",
+  "requestFramePermissions": []
+}

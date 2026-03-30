@@ -60,6 +60,139 @@ ALLOWED_MODELS = {
 DEFAULT_MODEL = "gemini-3-flash-preview"
 
 
+def parse_jd_with_gemini(jd_url: str, jd_text: str, api_key: str, model_name: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Parse job description into structured fields for ResumeAI flow.
+    """
+    model_id = (model_name or DEFAULT_MODEL).strip() if model_name else DEFAULT_MODEL
+    if model_id not in ALLOWED_MODELS:
+        model_id = DEFAULT_MODEL
+
+    if not jd_url and not jd_text:
+        raise ValueError("Either jd_url or jd_text is required.")
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(
+        model_name=model_id,
+        generation_config={
+            "temperature": 0.2,
+            "response_mime_type": "application/json",
+        },
+    )
+
+    prompt = f"""Extract the following information from this job description:
+{"URL: " + jd_url if jd_url else "Text: " + jd_text}
+
+Return a JSON object with these keys:
+jobTitle, company, requiredSkills (array), preferredSkills (array), responsibilities (array), atsKeywords (array).
+Return ONLY valid JSON."""
+
+    response = model.generate_content(prompt)
+    response_text = response.text.strip()
+    if response_text.startswith("```json"):
+        response_text = response_text[7:]
+    elif response_text.startswith("```"):
+        response_text = response_text[3:]
+    if response_text.endswith("```"):
+        response_text = response_text[:-3]
+    response_text = response_text.strip()
+
+    result = json.loads(response_text)
+    if not isinstance(result, dict):
+        raise ValueError("Response is not a valid JSON object")
+
+    required = ["jobTitle", "company", "requiredSkills", "preferredSkills", "responsibilities", "atsKeywords"]
+    for key in required:
+        if key not in result:
+            raise ValueError(f"Response missing required field: {key}")
+    return result
+
+
+def optimize_resume_for_resumeai(
+    resume_text: str,
+    jd_summary: Dict[str, Any],
+    latex_template: str,
+    api_key: str,
+    model_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Run ResumeAI optimization flow and return frontend-compatible shape.
+    """
+    model_id = (model_name or DEFAULT_MODEL).strip() if model_name else DEFAULT_MODEL
+    if model_id not in ALLOWED_MODELS:
+        model_id = DEFAULT_MODEL
+
+    if not resume_text or not resume_text.strip():
+        raise ValueError("resume_text is required.")
+    if not jd_summary or not isinstance(jd_summary, dict):
+        raise ValueError("jd_summary must be a valid object.")
+    if not latex_template or not latex_template.strip():
+        raise ValueError("latex_template is required.")
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(
+        model_name=model_id,
+        generation_config={
+            "temperature": 0.3,
+            "response_mime_type": "application/json",
+        },
+    )
+
+    prompt = f"""You are an expert ATS resume optimizer and technical recruiter.
+
+Given:
+1. RESUME (raw text): {resume_text}
+2. JOB DESCRIPTION (parsed): {json.dumps(jd_summary)}
+3. TARGET LATEX TEMPLATE: {latex_template}
+
+Do the following:
+A. Reformat the entire resume into the provided LaTeX template exactly.
+B. Simultaneously optimize EVERY bullet point and section for:
+   - ATS keyword matching with the JD
+   - Strong action verbs (Led, Engineered, Architected, Delivered, Optimized)
+   - Quantified impact (add realistic metrics if missing — do NOT fabricate, but suggest placeholders like "[X]% improvement")
+   - Removing filler words and weak language
+   - Reordering skills to front-load JD-relevant ones
+C. Return a JSON object with this exact structure:
+{{
+  "ats_score_before": <integer 0-100>,
+  "ats_score_after": <integer 0-100>,
+  "latex_original": "<full latex string of reformatted resume, no changes yet>",
+  "suggestions": [
+    {{
+      "id": "s1",
+      "section": "Experience | Projects | Skills | ...",
+      "type": "replace | insert | delete",
+      "original_text": "<exact text to find in latex>",
+      "suggested_text": "<replacement text>",
+      "reason": "<one-line professional reason>",
+      "ats_impact": "high | medium | low"
+    }}
+  ]
+}}
+Return ONLY valid JSON. No markdown, no explanation outside JSON."""
+
+    response = model.generate_content(prompt)
+    response_text = response.text.strip()
+    if response_text.startswith("```json"):
+        response_text = response_text[7:]
+    elif response_text.startswith("```"):
+        response_text = response_text[3:]
+    if response_text.endswith("```"):
+        response_text = response_text[:-3]
+    response_text = response_text.strip()
+
+    result = json.loads(response_text)
+    if not isinstance(result, dict):
+        raise ValueError("Response is not a valid JSON object")
+
+    required = ["ats_score_before", "ats_score_after", "latex_original", "suggestions"]
+    for key in required:
+        if key not in result:
+            raise ValueError(f"Response missing required field: {key}")
+    return result
+
+
 def analyze_resume_with_gemini(jd: str, resume_text: str, api_key: str, model_name: Optional[str] = None) -> Dict[str, Any]:
     """
     Analyze resume against job description using Google Gemini API.
