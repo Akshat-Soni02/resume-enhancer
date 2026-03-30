@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Upload,
   FileText,
@@ -237,10 +237,68 @@ const ATSMeter = ({ score, label, color }) => {
   );
 };
 
+const SummaryPill = ({ label }) => (
+  <span className="px-2 py-1 rounded-md bg-slate-800 text-slate-300 text-[11px] font-medium">
+    {label}
+  </span>
+);
+
+const SummaryList = ({ title, items, max = 4 }) => {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">{title}</p>
+      <ul className="space-y-1.5">
+        {items.slice(0, max).map((item) => (
+          <li key={`${title}-${item}`} className="text-sm text-slate-300 leading-relaxed">
+            - {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+const AIStatusLines = ({ lines, isLoading, compact = false }) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading || !Array.isArray(lines) || lines.length === 0) return undefined;
+    setActiveIndex(0);
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % lines.length);
+    }, 1400);
+    return () => clearInterval(interval);
+  }, [isLoading, lines]);
+
+  if (!isLoading || !Array.isArray(lines) || lines.length === 0) return null;
+
+  return (
+    <div className={compact ? 'mt-3 space-y-1.5' : 'mt-6 space-y-2.5'}>
+      {lines.map((line, idx) => {
+        const isActive = idx === activeIndex;
+        return (
+          <motion.div
+            key={`${line}-${idx}`}
+            initial={{ opacity: 0.5 }}
+            animate={{ opacity: isActive ? 1 : 0.45, x: isActive ? 2 : 0 }}
+            className={`flex items-center ${compact ? 'gap-2' : 'gap-3'}`}
+          >
+            <span className={`${compact ? 'w-1 h-1' : 'w-1.5 h-1.5'} rounded-full ${isActive ? 'bg-indigo-400' : 'bg-slate-600'}`} />
+            <span className={`${compact ? 'text-xs' : 'text-sm'} ${isActive ? 'text-slate-300' : 'text-slate-500'}`}>{line}</span>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+};
+
 export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onApiKeyCleared }) {
   const [step, setStep] = useState(1);
   const [jdUrl, setJdUrl] = useState('');
   const [jdText, setJdText] = useState('');
+  const [isJdTextEnabled, setIsJdTextEnabled] = useState(false);
+  const [showFullJdSummary, setShowFullJdSummary] = useState(false);
   const [jdSummary, setJdSummary] = useState(null);
   const [resumeText, setResumeText] = useState('');
   const [resumeFileName, setResumeFileName] = useState('');
@@ -303,6 +361,14 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
     }
   };
 
+  const clearUploadedResume = () => {
+    setResumeText('');
+    setResumeFileName('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const parseJD = async () => {
     if (!jdUrl && !jdText) return;
     if (!effectiveApiKey) {
@@ -315,11 +381,12 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
     try {
       const data = await parseResumeAiJD({
         jdUrl,
-        jdText,
+        jdText: isJdTextEnabled ? jdText : '',
         apiKey: effectiveApiKey,
         modelId: selectedModel,
       });
       setJdSummary(data);
+      setShowFullJdSummary(false);
     } catch (err) {
       withAxiosError(err, 'Failed to parse Job Description. Please try pasting the text manually.');
     } finally {
@@ -426,18 +493,123 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
                   <div className="flex items-center space-x-3 mb-6"><Search size={20} className="text-indigo-400" /><h2 className="text-xl font-bold text-white">Job Description</h2></div>
                   <div className="space-y-4">
                     <input type="text" placeholder="https://linkedin.com/jobs/..." className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" value={jdUrl} onChange={(e) => setJdUrl(e.target.value)} />
-                    <textarea placeholder="Paste the job description here..." className="w-full h-48 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white resize-none" value={jdText} onChange={(e) => setJdText(e.target.value)} />
-                    <button onClick={parseJD} disabled={isParsingJD || (!jdUrl && !jdText)} className="w-full bg-indigo-600 disabled:bg-slate-800 text-white font-bold py-3 rounded-xl flex items-center justify-center space-x-2">
+                    <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2">
+                      <span className="text-sm text-slate-300">Enable manual JD paste</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsJdTextEnabled((prev) => !prev)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isJdTextEnabled ? 'bg-indigo-600' : 'bg-slate-700'}`}
+                        aria-pressed={isJdTextEnabled}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isJdTextEnabled ? 'translate-x-6' : 'translate-x-1'}`}
+                        />
+                      </button>
+                    </div>
+                    {isJdTextEnabled && (
+                      <textarea
+                        placeholder="Paste the job description here..."
+                        className="w-full h-48 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white resize-none"
+                        value={jdText}
+                        onChange={(e) => setJdText(e.target.value)}
+                      />
+                    )}
+                    <button onClick={parseJD} disabled={isParsingJD || (!jdUrl && !(isJdTextEnabled && jdText))} className="w-full bg-indigo-600 disabled:bg-slate-800 text-white font-bold py-3 rounded-xl flex items-center justify-center space-x-2">
                       {isParsingJD ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
                       <span>{isParsingJD ? 'Parsing...' : 'Parse JD'}</span>
                     </button>
+                    <AIStatusLines
+                      isLoading={isParsingJD}
+                      lines={[
+                        'Reading the job post and extracting role context...',
+                        'Identifying must-have keywords and domain terms...',
+                        'Separating required and preferred skills...',
+                        'Structuring insights for ATS-focused optimization...',
+                      ]}
+                    />
                   </div>
+
+                  {jdSummary && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-5 p-4 rounded-xl border border-slate-800 bg-slate-900/70"
+                    >
+                      <div className="mb-4">
+                        <p className="text-lg font-semibold text-slate-100">{jdSummary.jobTitle || 'Role'}</p>
+                        <p className="text-sm text-slate-400">{jdSummary.company || 'Company not detected'}</p>
+                      </div>
+
+                      <div className="space-y-4">
+                        {Array.isArray(jdSummary.atsKeywords) && jdSummary.atsKeywords.length > 0 && (
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">ATS Keywords</p>
+                            <div className="flex flex-wrap gap-2">
+                              {jdSummary.atsKeywords.slice(0, showFullJdSummary ? 12 : 5).map((kw) => (
+                                <SummaryPill key={`kw-${kw}`} label={kw} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {Array.isArray(jdSummary.requiredSkills) && jdSummary.requiredSkills.length > 0 && (
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">Required Skills</p>
+                              <div className="flex flex-wrap gap-2">
+                                {jdSummary.requiredSkills.slice(0, showFullJdSummary ? 10 : 3).map((skill) => (
+                                  <SummaryPill key={`req-${skill}`} label={skill} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {Array.isArray(jdSummary.preferredSkills) && jdSummary.preferredSkills.length > 0 && (
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">Preferred Skills</p>
+                              <div className="flex flex-wrap gap-2">
+                                {jdSummary.preferredSkills.slice(0, showFullJdSummary ? 10 : 2).map((skill) => (
+                                  <SummaryPill key={`pref-${skill}`} label={skill} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {showFullJdSummary && <SummaryList title="Top Responsibilities" items={jdSummary.responsibilities} max={5} />}
+
+                        <button
+                          type="button"
+                          onClick={() => setShowFullJdSummary((prev) => !prev)}
+                          className="text-sm text-indigo-400 hover:text-indigo-300 font-medium"
+                        >
+                          {showFullJdSummary ? 'Show less' : 'Show more details'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
                 </motion.div>
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
                   <div className="flex items-center space-x-3 mb-6"><Upload size={20} className="text-emerald-400" /><h2 className="text-xl font-bold text-white">Resume Upload</h2></div>
                   <div onClick={() => fileInputRef.current?.click()} className={`border-2 border-dashed rounded-2xl p-12 cursor-pointer ${resumeText ? 'border-emerald-500/50' : 'border-slate-800'}`}>
                     <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleFileUpload} />
-                    {resumeText ? <div className="text-center"><CheckCircle2 className="mx-auto text-emerald-400 mb-3" /><p className="text-white font-bold">{resumeFileName}</p></div> : <div className="text-center"><FileText className="mx-auto text-slate-500 mb-3" /><p className="text-white font-bold">Drop your resume here</p></div>}
+                    {resumeText ? (
+                      <div className="text-center">
+                        <CheckCircle2 className="mx-auto text-emerald-400 mb-3" />
+                        <p className="text-white font-bold">{resumeFileName}</p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearUploadedResume();
+                          }}
+                          className="mt-3 text-xs text-rose-400 hover:text-rose-300 font-medium"
+                        >
+                          Remove file
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center"><FileText className="mx-auto text-slate-500 mb-3" /><p className="text-white font-bold">Drop your resume here</p></div>
+                    )}
                   </div>
                   <button onClick={optimizeResume} disabled={!resumeText || !jdSummary || isOptimizing} className="w-full mt-8 bg-white disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold py-4 rounded-xl flex items-center justify-center space-x-2">
                     {isOptimizing ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} className="text-indigo-600" />}
@@ -449,7 +621,19 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
 
             {step === 2 && (
               isOptimizing ? (
-                <div className="flex flex-col items-center justify-center py-24"><Loader2 className="animate-spin text-indigo-500" size={40} /></div>
+                <div className="flex flex-col items-center justify-center py-24">
+                  <Loader2 className="animate-spin text-indigo-500" size={40} />
+                  <p className="mt-4 text-lg font-semibold text-slate-200">Optimizing your resume with AI</p>
+                  <AIStatusLines
+                    isLoading={isOptimizing}
+                    lines={[
+                      'Matching your resume against parsed JD signals...',
+                      'Rewriting bullets for impact and keyword alignment...',
+                      'Preparing LaTeX output and suggestion candidates...',
+                      'Calculating before/after ATS score estimates...',
+                    ]}
+                  />
+                </div>
               ) : (
                 <div className="space-y-8">
                   <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 flex items-center gap-10">
@@ -504,7 +688,24 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
                           <a href={pdfUrl} target="_blank" rel="noreferrer" className="p-2 bg-indigo-600 rounded-lg text-white"><ExternalLink size={16} /></a>
                         </div>
                       </div>
-                      <div className="aspect-[3/4] bg-slate-950 rounded-xl overflow-hidden">{isCompiling ? <Loader2 className="animate-spin text-indigo-500 m-6" /> : <iframe src={pdfUrl} className="w-full h-full border-none" title="PDF Preview" />}</div>
+                      <div className="aspect-[3/4] bg-slate-950 rounded-xl overflow-hidden">
+                        {isCompiling ? (
+                          <div className="p-4">
+                            <Loader2 className="animate-spin text-indigo-500 mb-2" size={24} />
+                            <AIStatusLines
+                              isLoading={isCompiling}
+                              compact
+                              lines={[
+                                'Compiling LaTeX source...',
+                                'Building ATS-ready PDF preview...',
+                                'Finalizing render output...',
+                              ]}
+                            />
+                          </div>
+                        ) : (
+                          <iframe src={pdfUrl} className="w-full h-full border-none" title="PDF Preview" />
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
