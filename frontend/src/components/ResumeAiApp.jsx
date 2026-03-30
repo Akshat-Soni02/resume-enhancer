@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowLeft,
   Upload,
   FileText,
   CheckCircle2,
@@ -477,6 +478,18 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
 
       <main className="max-w-7xl mx-auto px-4 py-12">
         <StepIndicator currentStep={step} />
+        {step > 1 && (
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => setStep((prev) => Math.max(1, prev - 1))}
+              className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              <ArrowLeft size={16} />
+              <span>Back to previous step</span>
+            </button>
+          </div>
+        )}
         {error && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center space-x-3 text-rose-400">
             <AlertCircle size={20} />
@@ -611,6 +624,14 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
                       <div className="text-center"><FileText className="mx-auto text-slate-500 mb-3" /><p className="text-white font-bold">Drop your resume here</p></div>
                     )}
                   </div>
+                  {resumeText && (
+                    <div className="mt-6">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-2">Extracted Text Preview</p>
+                      <div className="h-48 overflow-y-auto bg-slate-950 border border-slate-800 rounded-xl p-4 text-slate-400 text-xs font-mono whitespace-pre-wrap">
+                        {resumeText}
+                      </div>
+                    </div>
+                  )}
                   <button onClick={optimizeResume} disabled={!resumeText || !jdSummary || isOptimizing} className="w-full mt-8 bg-white disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold py-4 rounded-xl flex items-center justify-center space-x-2">
                     {isOptimizing ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} className="text-indigo-600" />}
                     <span>{isOptimizing ? 'Optimizing...' : 'Optimize Resume →'}</span>
