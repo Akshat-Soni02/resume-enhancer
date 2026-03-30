@@ -18,7 +18,6 @@ import {
   Search,
   Layout,
   RefreshCw,
-  Settings,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -503,20 +502,8 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-200 selection:bg-indigo-500/30">
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center"><Zap size={18} className="text-white" /></div>
-            <h1 className="text-xl font-black tracking-tighter text-white">ResumeAI</h1>
-          </div>
-          <button onClick={() => { onOpenSettings?.(); }} className="p-2 rounded-lg text-slate-300 hover:bg-slate-800">
-            <Settings size={18} />
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-12">
+    <div>
+      <main>
         <StepIndicator currentStep={step} />
         {step > 1 && (
           <div className="mb-6">
@@ -703,7 +690,7 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
                       <div className="flex flex-col items-center">
                         <div className="mb-4 flex flex-col items-center">
                           <div className="px-3 py-1 rounded-full border border-indigo-500/20 bg-indigo-500/10">
-                            <span className="text-xs font-black text-indigo-200 uppercase tracking-[0.3em]">ATS Score</span>
+                            <span className="text-xs font-black text-indigo-200 uppercase tracking-[0.3em]">Match Score</span>
                           </div>
                           <div className="mt-3 h-px w-20 bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
                         </div>
@@ -768,8 +755,15 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
                       {optimizationResult?.suggestions?.map((s) => {
                         const isAccepted = acceptedSuggestions.has(s.id);
                         return (
-                          <div key={s.id} className={`p-4 rounded-xl border transition-all ${isAccepted ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
-                            <div className="flex items-start justify-between gap-3 mb-2">
+                          <div
+                            key={s.id}
+                            className={`relative p-4 rounded-xl border transition-all ${
+                              isAccepted
+                                ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70'
+                                : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="absolute top-3 right-3 flex items-center gap-2">
                               <ImpactBadge impact={s.ats_impact} />
                               {isAccepted && <Check size={16} className="text-emerald-500" />}
                             </div>
@@ -906,45 +900,6 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
           </motion.div>
         </AnimatePresence>
       </main>
-
-      <footer className="border-t border-slate-800 py-12 mt-24">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12">
-          <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-6 h-6 bg-indigo-600 rounded flex items-center justify-center">
-                <Zap size={14} className="text-white" />
-              </div>
-              <h1 className="text-lg font-black tracking-tighter text-white">ResumeAI</h1>
-            </div>
-            <p className="text-slate-500 text-sm max-w-sm leading-relaxed">
-              The ultimate AI-powered resume optimizer. Tailor your resume to any job description in seconds and get past the ATS filters.
-            </p>
-          </div>
-          <div>
-            <h4 className="text-white font-bold mb-4 text-sm">Product</h4>
-            <ul className="space-y-2 text-sm text-slate-500">
-              <li><a href="#" className="hover:text-indigo-400 transition-colors">Features</a></li>
-              <li><a href="#" className="hover:text-indigo-400 transition-colors">Pricing</a></li>
-              <li><a href="#" className="hover:text-indigo-400 transition-colors">Templates</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="text-white font-bold mb-4 text-sm">Resources</h4>
-            <ul className="space-y-2 text-sm text-slate-500">
-              <li><a href="#" className="hover:text-indigo-400 transition-colors">Blog</a></li>
-              <li><a href="#" className="hover:text-indigo-400 transition-colors">ATS Guide</a></li>
-              <li><a href="#" className="hover:text-indigo-400 transition-colors">Support</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 mt-12 pt-8 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-slate-600 text-xs">© 2026 ResumeAI. Built with Gemini 1.5 Pro.</p>
-          <div className="flex space-x-6 text-slate-600 text-xs">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

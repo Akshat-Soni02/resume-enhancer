@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import SettingsModal, { getApiKey, getModel, clearApiKey } from './components/SettingsModal';
+import SiteLayout from './components/SiteLayout';
 import ResumeAiApp from './components/ResumeAiApp';
+import Features from './pages/Features';
+import Pricing from './pages/Pricing';
+import Templates from './pages/Templates';
+import Blog from './pages/Blog';
+import ATSGuide from './pages/ATSGuide';
+import Support from './pages/Support';
+import { Privacy, Terms } from './pages/Legal';
 
 function App() {
   const [apiKey, setApiKey] = useState(null);
@@ -26,23 +35,41 @@ function App() {
   };
 
   return (
-    <>
-      <ResumeAiApp
-        apiKey={apiKey}
-        selectedModel={selectedModel}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onApiKeyCleared={() => {
-          clearApiKey();
-          setApiKey(null);
-        }}
-      />
+    <BrowserRouter>
+      <Routes>
+        <Route element={<SiteLayout onOpenSettings={() => setIsSettingsOpen(true)} />}>
+          <Route
+            path="/"
+            element={
+              <ResumeAiApp
+                apiKey={apiKey}
+                selectedModel={selectedModel}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onApiKeyCleared={() => {
+                  clearApiKey();
+                  setApiKey(null);
+                }}
+              />
+            }
+          />
+          <Route path="/features" element={<Features />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/ats-guide" element={<ATSGuide />} />
+          <Route path="/support" element={<Support />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+        </Route>
+      </Routes>
+
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onApiKeySet={handleApiKeySet}
         onModelSet={handleModelSet}
       />
-    </>
+    </BrowserRouter>
   );
 }
 
