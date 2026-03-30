@@ -2,9 +2,17 @@ from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 import os
+import requests
+from fastapi.responses import Response
 
 from text_extraction import extract_text_from_file
-from gemini_client import analyze_resume_with_gemini, analyze_source_with_gemini
+from gemini_client import (
+    analyze_resume_with_gemini,
+    analyze_source_with_gemini,
+    parse_jd_with_gemini,
+    optimize_resume_for_resumeai,
+)
+import json
 
 app = FastAPI(title="Resume Optimizer API")
 
@@ -134,6 +142,96 @@ async def process_source(
         elif "429" in error_message or "rate limit" in error_message.lower():
             raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
         raise HTTPException(status_code=500, detail=f"An error occurred: {error_message}")
+
+
+@app.post("/resumeai/parse-jd")
+async def resumeai_parse_jd(
+    jd_url: str = Form(""),
+    jd_text: str = Form(""),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    x_gemini_model: Optional[str] = Header(None, alias="X-Gemini-Model"),
+):
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="API key is required in X-API-Key header")
+    if not jd_url and not jd_text:
+        raise HTTPException(status_code=400, detail="Either jd_url or jd_text is required.")
+    try:
+        return parse_jd_with_gemini(jd_url.strip(), jd_text.strip(), x_api_key, x_gemini_model)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        error_message = str(e)
+        if "401" in error_message or "Unauthorized" in error_message:
+            raise HTTPException(status_code=401, detail="Invalid API key. Please check your Gemini API key.")
+        elif "429" in error_message or "rate limit" in error_message.lower():
+            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+        raise HTTPException(status_code=500, detail=f"An error occurred: {error_message}")
+
+
+@app.post("/resumeai/optimize")
+async def resumeai_optimize(
+    resume_text: str = Form(...),
+    jd_summary: str = Form(...),
+    latex_template: str = Form(...),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    x_gemini_model: Optional[str] = Header(None, alias="X-Gemini-Model"),
+):
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="API key is required in X-API-Key header")
+    if not resume_text or len(resume_text.strip()) < 20:
+        raise HTTPException(status_code=400, detail="resume_text is required.")
+    try:
+        jd_summary_obj = json.loads(jd_summary)
+    except Exception:
+        raise HTTPException(status_code=400, detail="jd_summary must be valid JSON.")
+    try:
+        return optimize_resume_for_resumeai(
+            resume_text=resume_text,
+            jd_summary=jd_summary_obj,
+            latex_template=latex_template,
+            api_key=x_api_key,
+            model_name=x_gemini_model,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        error_message = str(e)
+        if "401" in error_message or "Unauthorized" in error_message:
+            raise HTTPException(status_code=401, detail="Invalid API key. Please check your Gemini API key.")
+        elif "429" in error_message or "rate limit" in error_message.lower():
+            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+        raise HTTPException(status_code=500, detail=f"An error occurred: {error_message}")
+
+
+@app.post("/resumeai/compile-latex")
+async def resumeai_compile_latex(
+    latex: str = Form(...),
+):
+    """
+    Compile LaTeX to PDF via latexonline.cc using POST to avoid URL length limits.
+    Returns application/pdf bytes.
+    """
+    if not latex or len(latex.strip()) < 20:
+        raise HTTPException(status_code=400, detail="latex is required.")
+    try:
+        resp = requests.post(
+            "https://latexonline.cc/compile",
+            data={"text": latex},
+            timeout=60,
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"LaTeX compile failed (status {resp.status_code}).")
+        content_type = resp.headers.get("Content-Type", "")
+        if "application/pdf" not in content_type:
+            # latexonline may return error text/html
+            raise HTTPException(status_code=502, detail="LaTeX compile did not return a PDF.")
+        return Response(content=resp.content, media_type="application/pdf")
+    except HTTPException:
+        raise
+    except requests.Timeout:
+        raise HTTPException(status_code=504, detail="LaTeX compile timed out.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 
 if __name__ == "__main__":
