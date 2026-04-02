@@ -1,5 +1,9 @@
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
@@ -7,6 +11,8 @@ import os
 import requests
 from fastapi.responses import Response
 
+from firebase_init import init_firebase
+from routers.api_v1 import router as api_v1_router
 from job_spaces import init_db, router as job_spaces_router
 from text_extraction import extract_text_from_file
 from gemini_client import (
@@ -17,6 +23,8 @@ from gemini_client import (
 )
 import json
 
+init_firebase()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,6 +33,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Resume Optimizer API", lifespan=lifespan)
+app = FastAPI(title="Resume Optimizer API")
+app.include_router(api_v1_router)
 
 # CORS configuration - must be added before routes
 # Allow specific origins for production and development (localhost + 127.0.0.1 for both ports)

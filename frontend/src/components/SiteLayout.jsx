@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { Settings, Zap } from 'lucide-react';
+import { LogIn, Settings, Zap, User } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const navLinkClass = ({ isActive }) =>
   `text-sm font-medium transition-colors ${
@@ -15,6 +16,8 @@ const optimizeLinkClass = ({ isActive }) =>
   }`;
 
 export default function SiteLayout({ onOpenSettings }) {
+  const { user, loading, firebaseReady, signInWithGoogle, signOutUser } = useAuth();
+
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-200 selection:bg-indigo-500/30">
       <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
@@ -37,6 +40,7 @@ export default function SiteLayout({ onOpenSettings }) {
             <NavLink to="/job-spaces" className={navLinkClass}>Job spaces</NavLink>
           </nav>
 
+<<<<<<< HEAD
           <NavLink
             to="/job-spaces"
             className="md:hidden text-sm font-medium text-indigo-300 hover:text-white shrink-0"
@@ -52,6 +56,61 @@ export default function SiteLayout({ onOpenSettings }) {
           >
             <Settings size={18} />
           </button>
+=======
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            {loading ? (
+              <span className="h-9 w-20 rounded-lg bg-slate-800/80 animate-pulse" aria-hidden />
+            ) : user && firebaseReady ? (
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Link
+                  to="/account"
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/40 px-2.5 sm:px-3 py-2 text-sm text-slate-200 hover:bg-slate-800 hover:text-white"
+                  title="Account"
+                >
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="" className="w-7 h-7 rounded-full border border-slate-600" />
+                  ) : (
+                    <User size={16} className="text-slate-400" />
+                  )}
+                  <span className="max-w-[100px] sm:max-w-[140px] truncate hidden sm:inline">
+                    {user.displayName || user.email}
+                  </span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => signOutUser()}
+                  className="rounded-lg px-2.5 py-2 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={!firebaseReady}
+                onClick={() => firebaseReady && signInWithGoogle().catch(() => {})}
+                title={
+                  firebaseReady
+                    ? 'Sign in with Google'
+                    : 'Add VITE_FIREBASE_API_KEY and related keys in .env to enable sign-in'
+                }
+                className="inline-flex items-center gap-2 rounded-lg border border-indigo-500/40 bg-indigo-600/20 px-3 py-2 text-sm font-semibold text-indigo-100 hover:bg-indigo-600/35 hover:border-indigo-400/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600/20"
+              >
+                <LogIn size={18} className="shrink-0" />
+                <span className="hidden sm:inline">Log in</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="inline-flex items-center justify-center p-2 rounded-lg border border-slate-700/80 text-slate-300 hover:bg-slate-800 hover:text-white"
+              title="Settings"
+              aria-label="Settings"
+            >
+              <Settings size={18} />
+            </button>
+          </div>
+>>>>>>> d0c2580 (feat(profile): firebase profile)
         </div>
       </header>
 

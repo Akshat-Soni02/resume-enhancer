@@ -25,6 +25,8 @@ import Confetti from 'react-confetti';
 import axios from 'axios';
 import { clearApiKey } from './SettingsModal';
 import { optimizeResumeAi, parseResumeAiJD } from '../utils/resumeAiApi';
+import { useAuth } from '../context/AuthContext';
+import { createResume, createResumeExport, listTemplates } from '../utils/authApi';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -332,6 +334,13 @@ const LatexConsole = ({ filename = 'resume_optimized.tex', content }) => (
 );
 
 export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onApiKeyCleared }) {
+  const { user, getIdToken, firebaseReady } = useAuth();
+  const [cloudTemplateId, setCloudTemplateId] = useState('default-jake-style');
+  const [resumeTitleForCloud, setResumeTitleForCloud] = useState('');
+  const [cloudSaveMsg, setCloudSaveMsg] = useState(null);
+  const [cloudSaveErr, setCloudSaveErr] = useState(null);
+  const [cloudSaving, setCloudSaving] = useState(false);
+
   const [step, setStep] = useState(1);
   const [jdUrl, setJdUrl] = useState('');
   const [jdText, setJdText] = useState('');
@@ -349,6 +358,24 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
   const fileInputRef = useRef(null);
 
   const effectiveApiKey = useMemo(() => apiKey || null, [apiKey]);
+
+  useEffect(() => {
+    if (!user || !firebaseReady) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await listTemplates(getIdToken);
+        if (!cancelled && Array.isArray(list) && list.length > 0) {
+          setCloudTemplateId(list[0].id);
+        }
+      } catch {
+        /* ignore — user can still save with default id if seeded */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, firebaseReady, getIdToken]);
 
   const withAxiosError = (err, fallback) => {
     if (axios.isAxiosError(err)) {
@@ -489,6 +516,51 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
 
   const goToExport = () => {
     setStep(3);
+  };
+
+  const saveResumeToCloud = async () => {
+    if (!user || !firebaseReady) return;
+    const title = (resumeTitleForCloud || resumeFileName || 'My resume').trim();
+    if (!title) {
+      setCloudSaveErr('Enter a title for this saved resume.');
+      return;
+    }
+    setCloudSaving(true);
+    setCloudSaveErr(null);
+    setCloudSaveMsg(null);
+    try {
+      await createResume(getIdToken, {
+        title,
+        template_id: cloudTemplateId,
+        source_resume_text: resumeText,
+        jd_summary_snapshot: jdSummary || {},
+      });
+      setCloudSaveMsg('Resume saved to your profile.');
+    } catch (e) {
+      setCloudSaveErr(e?.response?.data?.detail || e.message || 'Could not save resume.');
+    } finally {
+      setCloudSaving(false);
+    }
+  };
+
+  const saveExportToCloud = async () => {
+    if (!user || !firebaseReady) return;
+    setCloudSaving(true);
+    setCloudSaveErr(null);
+    setCloudSaveMsg(null);
+    try {
+      await createResumeExport(getIdToken, {
+        job_title: jdSummary?.jobTitle || 'Application',
+        company: jdSummary?.company || '',
+        jd_summary_snapshot: jdSummary || {},
+        optimized_latex: currentLatex,
+      });
+      setCloudSaveMsg('Export saved to application history.');
+    } catch (e) {
+      setCloudSaveErr(e?.response?.data?.detail || e.message || 'Could not save export.');
+    } finally {
+      setCloudSaving(false);
+    }
   };
 
   const downloadTex = () => {
@@ -814,6 +886,45 @@ export default function ResumeAiApp({ apiKey, selectedModel, onOpenSettings, onA
                   <h2 className="text-3xl font-bold text-white">Resume Optimized!</h2>
                   <p className="text-slate-400 mt-2">Your resume is now ATS-ready and formatted in professional LaTeX.</p>
                 </div>
+                {firebaseReady && user && (
+                  <div className="rounded-2xl border border-indigo-500/20 bg-indigo-950/20 p-6 space-y-4">
+                    <h3 className="text-lg font-bold text-white">Cloud sync</h3>
+                    <p className="text-slate-400 text-sm">
+                      Save your working resume and this job context to your account, or record this optimized .tex in application history.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                      <div className="flex-1">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Label (saved resume)</label>
+                        <input
+                          type="text"
+                          value={resumeTitleForCloud}
+                          onChange={(e) => setResumeTitleForCloud(e.target.value)}
+                          placeholder={resumeFileName || 'e.g. SWE — Acme Corp'}
+                          className="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white text-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={cloudSaving || !resumeText}
+                        onClick={saveResumeToCloud}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-bold"
+                      >
+                        Save resume
+                      </button>
+                      <button
+                        type="button"
+                        disabled={cloudSaving || !currentLatex}
+                        onClick={saveExportToCloud}
+                        className="px-4 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-200 text-sm font-bold"
+                      >
+                        Save export
+                      </button>
+                    </div>
+                    {cloudSaveMsg && <p className="text-emerald-400 text-sm">{cloudSaveMsg}</p>}
+                    {cloudSaveErr && <p className="text-rose-400 text-sm">{cloudSaveErr}</p>}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <h3 className="text-xl font-bold text-white flex items-center space-x-2">

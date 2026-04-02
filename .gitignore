@@ -36,6 +36,11 @@ Thumbs.db
 .env
 .env.local
 
+# GCP / Firebase service account keys (never commit)
+*firebase-adminsdk*.json
+*service-account*.json
+backend/resumeai-*.json
+
 # Logs
 *.log
 

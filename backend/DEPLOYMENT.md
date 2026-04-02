@@ -135,6 +135,16 @@ gcloud run deploy resume-optimizer-api --source . --region us-central1
 gcloud run services describe resume-optimizer-api --region us-central1
 ```
 
+## Firebase Admin & Firestore (optional)
+
+For `/api/v1/*` routes (Google sign-in + Firestore), set:
+
+- `FIREBASE_PROJECT_ID` / `GOOGLE_CLOUD_PROJECT` — e.g. `resumeai-d3bd5`
+- `GOOGLE_APPLICATION_CREDENTIALS` — path to a **service account JSON** with Firestore access, **or**
+- `FIREBASE_SERVICE_ACCOUNT_JSON` — full JSON string (e.g. from Secret Manager)
+
+Do **not** commit the JSON file. For Cloud Run, mount credentials via Secret Manager or workload identity.
+
 ## Environment Variables (if needed)
 
 If you need to set environment variables:

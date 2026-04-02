@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import SettingsModal, { getApiKey, getModel, clearApiKey } from './components/SettingsModal';
 import SiteLayout from './components/SiteLayout';
 import ResumeAiApp from './components/ResumeAiApp';
+import Account from './pages/Account';
 import Features from './pages/Features';
 import Pricing from './pages/Pricing';
 import Templates from './pages/Templates';
@@ -36,6 +38,7 @@ function App() {
   };
 
   return (
+    <AuthProvider>
     <BrowserRouter>
       <Routes>
         <Route element={<SiteLayout onOpenSettings={() => setIsSettingsOpen(true)} />}>
@@ -62,6 +65,7 @@ function App() {
           <Route path="/job-spaces" element={<JobSpaces />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
+          <Route path="/account" element={<Account />} />
         </Route>
       </Routes>
 
@@ -72,6 +76,7 @@ function App() {
         onModelSet={handleModelSet}
       />
     </BrowserRouter>
+    </AuthProvider>
   );
 }
 
