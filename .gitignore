@@ -39,3 +39,6 @@ Thumbs.db
 # Logs
 *.log
 
+# Local job spaces SQLite DB
+backend/job_spaces.db
+

@@ -9,6 +9,7 @@ import Templates from './pages/Templates';
 import Blog from './pages/Blog';
 import ATSGuide from './pages/ATSGuide';
 import Support from './pages/Support';
+import JobSpaces from './pages/JobSpaces';
 import { Privacy, Terms } from './pages/Legal';
 
 function App() {
@@ -58,6 +59,7 @@ function App() {
           <Route path="/blog" element={<Blog />} />
           <Route path="/ats-guide" element={<ATSGuide />} />
           <Route path="/support" element={<Support />} />
+          <Route path="/job-spaces" element={<JobSpaces />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
         </Route>

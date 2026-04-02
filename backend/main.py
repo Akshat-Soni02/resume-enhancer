@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
@@ -5,6 +7,7 @@ import os
 import requests
 from fastapi.responses import Response
 
+from job_spaces import init_db, router as job_spaces_router
 from text_extraction import extract_text_from_file
 from gemini_client import (
     analyze_resume_with_gemini,
@@ -14,7 +17,14 @@ from gemini_client import (
 )
 import json
 
-app = FastAPI(title="Resume Optimizer API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Resume Optimizer API", lifespan=lifespan)
 
 # CORS configuration - must be added before routes
 # Allow specific origins for production and development (localhost + 127.0.0.1 for both ports)
@@ -32,12 +42,14 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-API-Key", "X-Gemini-Model", "Authorization", "Accept"],
+    allow_headers=["Content-Type", "X-API-Key", "X-Gemini-Model", "X-User-Id", "Authorization", "Accept"],
     expose_headers=["*"],
     max_age=600,
 )
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+app.include_router(job_spaces_router)
 
 
 @app.get("/")

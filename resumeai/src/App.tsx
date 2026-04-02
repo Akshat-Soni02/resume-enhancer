@@ -16,6 +16,7 @@ import StepIndicator from './components/StepIndicator';
 import StepOne from './components/StepOne';
 import StepTwo from './components/StepTwo';
 import StepThree from './components/StepThree';
+import JobSpacesView from './components/JobSpacesView';
 import type { JDSummary, OptimizationResult, Suggestion } from './types';
 
 // PDF.js worker setup
@@ -206,6 +207,7 @@ const LATEX_TEMPLATE = `%-------------------------
 \\end{document}`;
 
 export default function App() {
+  const [appView, setAppView] = useState<'resume' | 'spaces'>('resume');
   const [step, setStep] = useState(1);
   const [jdUrl, setJdUrl] = useState("");
   const [jdText, setJdText] = useState("");
@@ -423,83 +425,98 @@ export default function App() {
             <h1 className="text-xl font-black tracking-tighter text-white">ResumeAI</h1>
           </div>
           
-          <div className="hidden md:flex items-center space-x-6">
-            <a href="#" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Templates</a>
-            <a href="#" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">ATS Guide</a>
-            <button className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-4 py-2 rounded-lg transition-all">
-              Sign In
+          <div className="flex items-center gap-1 rounded-lg bg-slate-800/60 p-1">
+            <button
+              type="button"
+              onClick={() => setAppView('resume')}
+              className={`text-xs sm:text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${appView === 'resume' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              Resume
+            </button>
+            <button
+              type="button"
+              onClick={() => setAppView('spaces')}
+              className={`text-xs sm:text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${appView === 'spaces' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              Job spaces
             </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-12">
-        <StepIndicator currentStep={step} />
+        {appView === 'spaces' ? (
+          <JobSpacesView onBack={() => setAppView('resume')} />
+        ) : (
+          <>
+            <StepIndicator currentStep={step} />
 
-        {error && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center space-x-3 text-rose-400"
-          >
-            <AlertCircle size={20} />
-            <span className="text-sm font-medium">{error}</span>
-            <button onClick={() => setError(null)} className="ml-auto">
-              <X size={16} />
-            </button>
-          </motion.div>
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center space-x-3 text-rose-400"
+              >
+                <AlertCircle size={20} />
+                <span className="text-sm font-medium">{error}</span>
+                <button onClick={() => setError(null)} className="ml-auto">
+                  <X size={16} />
+                </button>
+              </motion.div>
+            )}
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                {step === 1 && (
+                  <StepOne
+                    jdUrl={jdUrl}
+                    setJdUrl={setJdUrl}
+                    jdText={jdText}
+                    setJdText={setJdText}
+                    parseJD={parseJD}
+                    isParsingJD={isParsingJD}
+                    jdSummary={jdSummary}
+                    fileInputRef={fileInputRef}
+                    handleFileUpload={handleFileUpload}
+                    resumeText={resumeText}
+                    resumeFileName={resumeFileName}
+                    optimizeResume={optimizeResume}
+                    isOptimizing={isOptimizing}
+                  />
+                )}
+                {step === 2 && (
+                  <StepTwo
+                    isOptimizing={isOptimizing}
+                    optimizationResult={optimizationResult}
+                    currentLatex={currentLatex}
+                    acceptedSuggestions={acceptedSuggestions}
+                    acceptAllHighImpact={acceptAllHighImpact}
+                    applySuggestion={applySuggestion}
+                    rejectSuggestion={rejectSuggestion}
+                    compilePdf={compilePdf}
+                  />
+                )}
+                {step === 3 && (
+                  <StepThree
+                    optimizationResult={optimizationResult}
+                    jdSummary={jdSummary}
+                    isCompiling={isCompiling}
+                    pdfUrl={pdfUrl}
+                    downloadTex={downloadTex}
+                    copyToClipboard={copyToClipboard}
+                    onOptimizeAnother={() => setStep(1)}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </>
         )}
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            {step === 1 && (
-              <StepOne
-                jdUrl={jdUrl}
-                setJdUrl={setJdUrl}
-                jdText={jdText}
-                setJdText={setJdText}
-                parseJD={parseJD}
-                isParsingJD={isParsingJD}
-                jdSummary={jdSummary}
-                fileInputRef={fileInputRef}
-                handleFileUpload={handleFileUpload}
-                resumeText={resumeText}
-                resumeFileName={resumeFileName}
-                optimizeResume={optimizeResume}
-                isOptimizing={isOptimizing}
-              />
-            )}
-            {step === 2 && (
-              <StepTwo
-                isOptimizing={isOptimizing}
-                optimizationResult={optimizationResult}
-                currentLatex={currentLatex}
-                acceptedSuggestions={acceptedSuggestions}
-                acceptAllHighImpact={acceptAllHighImpact}
-                applySuggestion={applySuggestion}
-                rejectSuggestion={rejectSuggestion}
-                compilePdf={compilePdf}
-              />
-            )}
-            {step === 3 && (
-              <StepThree
-                optimizationResult={optimizationResult}
-                jdSummary={jdSummary}
-                isCompiling={isCompiling}
-                pdfUrl={pdfUrl}
-                downloadTex={downloadTex}
-                copyToClipboard={copyToClipboard}
-                onOptimizeAnother={() => setStep(1)}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
       </main>
 
       {/* Footer */}

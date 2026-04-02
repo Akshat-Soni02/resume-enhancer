@@ -34,7 +34,15 @@ export default function SiteLayout({ onOpenSettings }) {
             <NavLink to="/ats-guide" className={navLinkClass}>ATS Guide</NavLink>
             <NavLink to="/blog" className={navLinkClass}>Blog</NavLink>
             <NavLink to="/support" className={navLinkClass}>Support</NavLink>
+            <NavLink to="/job-spaces" className={navLinkClass}>Job spaces</NavLink>
           </nav>
+
+          <NavLink
+            to="/job-spaces"
+            className="md:hidden text-sm font-medium text-indigo-300 hover:text-white shrink-0"
+          >
+            Spaces
+          </NavLink>
 
           <button
             type="button"
@@ -71,6 +79,7 @@ export default function SiteLayout({ onOpenSettings }) {
               <li><Link to="/features" className="hover:text-indigo-400 transition-colors">Features</Link></li>
               <li><Link to="/pricing" className="hover:text-indigo-400 transition-colors">Pricing</Link></li>
               <li><Link to="/templates" className="hover:text-indigo-400 transition-colors">Templates</Link></li>
+              <li><Link to="/job-spaces" className="hover:text-indigo-400 transition-colors">Job spaces</Link></li>
             </ul>
           </div>
 
